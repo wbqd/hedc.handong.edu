@@ -1392,8 +1392,9 @@ if ( $mode == 'newtopic' || ( $mode == 'editpost' && $post_data['first_post'] ) 
 	}
 }
 
-//-- mod : custom function --------------------------------------------------------------------------------
-//-- add by wbqd
+//-- mod : custom user ban function --------------------------------------------------------------------------------
+//-- author: 정인호
+//-- date: 2014.3
 //
 // Prevent user to register more than two times in a week.
 //
@@ -1406,98 +1407,193 @@ if ( $mode == 'newtopic' || ( $mode == 'editpost' && $post_data['first_post'] ) 
 // 주의: 중복 방지를 위해 모든 변수는 cf_ prefix 붙이기.
 //
 // -- 2014.04.14 수정 : 109번 포럼이 222번으로 변경.
+// -- 2015.2.23 Add 231
 // 로그인한 사용자가 222번 포럼에 쓴 모든 포스팅 시간을 쿼리한다. 단, 관리자 그룹은 제외.
-$cf_sql = 	"SELECT	p.post_time
-			FROM	" . POSTS_TABLE . " p
-			JOIN	" . USERS_TABLE . " u
-			ON		u.user_id = p.poster_id
-			WHERE	p.forum_id = 222
-			AND		u.user_level = 0
-			AND 	u.user_id = " . $userdata['user_id'];
+if ( $forum_id == 222 ) {
+	$cf_sql = 	"SELECT	p.post_time
+				FROM	" . POSTS_TABLE . " p
+				JOIN	" . USERS_TABLE . " u
+				ON		u.user_id = p.poster_id
+				WHERE	p.forum_id = 222
+				AND		u.user_level = 0
+				AND 	u.user_id = " . $userdata['user_id'];
 
-if (!($cf_result = $db->sql_query($cf_sql)))
-{
-        message_die (GENERAL_ERROR, 'Unable to retrieve post_time');
-}
+	if (!($cf_result = $db->sql_query($cf_sql)))
+	{
+	        message_die (GENERAL_ERROR, 'Unable to retrieve post_time');
+	}
 
-// 오늘 날짜에서 포스팅 날짜를 빼서 그 값이 7일보다 작으면 cf_counter를 ++한다.
-$cf_week_in_sec = 7 * 24 * 60 * 60;
-$cf_counter = 0;
-while ($cf_row = $db->sql_fetchrow($cf_result))
-{
-	$cf_post_time = $cf_row['post_time'];
-	if ((time() - $cf_post_time) < $cf_week_in_sec)
-		$cf_counter++;
-}
-$db->sql_freeresult($cf_result);
+	// 오늘 날짜에서 포스팅 날짜를 빼서 그 값이 7일보다 작으면 cf_counter를 ++한다.
+	$cf_week_in_sec = 7 * 24 * 60 * 60;
+	$cf_counter = 0;
+	while ($cf_row = $db->sql_fetchrow($cf_result))
+	{
+		$cf_post_time = $cf_row['post_time'];
+		if ((time() - $cf_post_time) < $cf_week_in_sec)
+			$cf_counter++;
+	}
+	$db->sql_freeresult($cf_result);
 
-// 사용자 신청 금지 테이블에서 해당 유저가 있는지 쿼리한다. 이때 결과 정렬 순서는 ban_id의 역순이다. 역시 관리자 그룹은 제외.
-$cf_sql =	"SELECT		b.ban_until
-			FROM		" . USER_BAN_TABLE . " b
-			JOIN		" . USERS_TABLE . " u
-			ON			u.user_id = b.user_id
-			WHERE		u.user_id = " . $userdata['user_id'] . "
-			AND			u.user_level = 0
-			ORDER BY	b.ban_id DESC";
+	// 사용자 신청 금지 테이블에서 해당 유저가 있는지 쿼리한다. 이때 결과 정렬 순서는 ban_id의 역순이다. 역시 관리자 그룹은 제외.
+	$cf_sql =	"SELECT		b.ban_until
+				FROM		" . USER_BAN_TABLE . " b
+				JOIN		" . USERS_TABLE . " u
+				ON			u.user_id = b.user_id
+				WHERE		u.user_id = " . $userdata['user_id'] . "
+				AND			u.user_level = 0
+				AND			b.ban_section = 'English HD'
+				ORDER BY	b.ban_id DESC";
 
-if (!($cf_result = $db->sql_query($cf_sql)))
-{
-        message_die (GENERAL_ERROR, 'Unable to retrieve ban_until');
-}
+	if (!($cf_result = $db->sql_query($cf_sql)))
+	{
+	        message_die (GENERAL_ERROR, 'Unable to retrieve ban_until');
+	}
 
-$cf_row = $db->sql_fetchrow($cf_result);
+	$cf_row = $db->sql_fetchrow($cf_result);
 
-$db->sql_freeresult($cf_result);
+	$db->sql_freeresult($cf_result);
 
-$ban_flag = false;
+	$ban_flag = false;
 
-// 신청 금지 쿼리에서 결과가 있다면 해당일 까지 접근하지 못하게 막는다.
-if (!is_null($cf_row['ban_until']))
-{
-	$ban_until = $cf_row['ban_until'];
-	$cf_today = time();
-	$timestamp = strtotime($ban_until);
+	// 신청 금지 쿼리에서 결과가 있다면 해당일 까지 접근하지 못하게 막는다.
+	if (!is_null($cf_row['ban_until']))
+	{
+		$ban_until = $cf_row['ban_until'];
+		$cf_today = time();
+		$timestamp = strtotime($ban_until);
 
-	if (($timestamp - $cf_today) > 0)
-		$ban_flag = true;
+		if (($timestamp - $cf_today) > 0)
+			$ban_flag = true;
+		else
+			$ban_flag = false;
+	}
+
+	if ( $mode == 'newtopic' || ( $mode == 'editpost' && $post_data['first_post'] ) )
+	{
+		$template->assign_block_vars('switch_first_post', array());
+	}
+
+	// 만약 주 2회 이상 신청한 경우 알림 템플릿을 내보낸다.
+	else if ($cf_counter > 1 && ( $mode != 'editpost' ) )
+	{
+		$template->assign_block_vars('switch_not_approved_post', array(
+			'TIME' => time(),
+			'CF_POST_TIME' => $cf_post_time,
+			'CF_WEEK_IN_SEC' => $cf_week_in_sec,
+			'CF_COUNTER' => $cf_counter,
+			'CF_USER_NAME' => $userdata['username']
+			)
+		);
+	}
+
+	// 만약 신청 금지 리스트에 있는 경우 금지 템플릿을 내보낸다.
+	else if ($ban_flag)
+	{
+		$template->assign_block_vars('switch_baned', array(
+			'CF_USER_NAME' => $userdata['username'],
+			'BAN_UNTIL' => $ban_until)
+		);
+	}
 	else
-		$ban_flag = false;
+	{
+		$template->assign_block_vars('switch_not_first_post', array());
+	}
 }
 
-if ( $mode == 'newtopic' || ( $mode == 'editpost' && $post_data['first_post'] ) )
-{
-	$template->assign_block_vars('switch_first_post', array());
-}
+// -- forum 231
+if ( $forum_id == 231 ) {
+	$cf_sql = 	"SELECT	p.post_time
+				FROM	" . POSTS_TABLE . " p
+				JOIN	" . USERS_TABLE . " u
+				ON		u.user_id = p.poster_id
+				WHERE	p.forum_id = 231
+				AND		u.user_level = 0
+				AND 	u.user_id = " . $userdata['user_id'];
 
-// 만약 주 2회 이상 신청한 경우 알림 템플릿을 내보낸다.
-else if ($cf_counter > 1 && ( $mode != 'editpost' ) )
-{
-	$template->assign_block_vars('switch_not_approved_post', array(
-		'TIME' => time(),
-		'CF_POST_TIME' => $cf_post_time,
-		'CF_WEEK_IN_SEC' => $cf_week_in_sec,
-		'CF_COUNTER' => $cf_counter,
-		'CF_USER_NAME' => $userdata['username']
-		)
-	);
-}
+	if (!($cf_result = $db->sql_query($cf_sql)))
+	{
+	        message_die (GENERAL_ERROR, 'Unable to retrieve post_time');
+	}
 
-// 만약 신청 금지 리스트에 있는 경우 금지 템플릿을 내보낸다.
-else if ($ban_flag)
-{
-	$template->assign_block_vars('switch_baned', array(
-		'CF_USER_NAME' => $userdata['username'],
-		'BAN_UNTIL' => $ban_until)
-	);
-}
-else
-{
-	$template->assign_block_vars('switch_not_first_post', array());
-}
+	// 오늘 날짜에서 포스팅 날짜를 빼서 그 값이 7일보다 작으면 cf_counter를 ++한다.
+	$cf_week_in_sec = 7 * 24 * 60 * 60;
+	$cf_counter = 0;
+	while ($cf_row = $db->sql_fetchrow($cf_result))
+	{
+		$cf_post_time = $cf_row['post_time'];
+		if ((time() - $cf_post_time) < $cf_week_in_sec)
+			$cf_counter++;
+	}
+	$db->sql_freeresult($cf_result);
 
-// 실은 해당 페이지를 로드할 때 js로 경고창 띄우로 history.back()하게 만들어서 알림 템플릿과 신청 금지 템플릿은 보이지도 않지만, 혹시나 js 피해서 들어오는 영민한 사용자의 경우를 대비해서 php로도 대비 로직을 짜두었다. ;p
+	// 사용자 신청 금지 테이블에서 해당 유저가 있는지 쿼리한다. 이때 결과 정렬 순서는 ban_id의 역순이다. 역시 관리자 그룹은 제외.
+	$cf_sql =	"SELECT		b.ban_until
+				FROM		" . USER_BAN_TABLE . " b
+				JOIN		" . USERS_TABLE . " u
+				ON			u.user_id = b.user_id
+				WHERE		u.user_id = " . $userdata['user_id'] . "
+				AND			u.user_level = 0
+				AND			b.ban_section = 'Korean HD'
+				ORDER BY	b.ban_id DESC";
 
-//-- fin mod : custom function ----------------------------------------------------------------------------
+	if (!($cf_result = $db->sql_query($cf_sql)))
+	{
+	        message_die (GENERAL_ERROR, 'Unable to retrieve ban_until');
+	}
+
+	$cf_row = $db->sql_fetchrow($cf_result);
+
+	$db->sql_freeresult($cf_result);
+
+	$ban_flag = false;
+
+	// 신청 금지 쿼리에서 결과가 있다면 해당일 까지 접근하지 못하게 막는다.
+	if (!is_null($cf_row['ban_until']))
+	{
+		$ban_until = $cf_row['ban_until'];
+		$cf_today = time();
+		$timestamp = strtotime($ban_until);
+
+		if (($timestamp - $cf_today) > 0)
+			$ban_flag = true;
+		else
+			$ban_flag = false;
+	}
+
+	if ( $mode == 'newtopic' || ( $mode == 'editpost' && $post_data['first_post'] ) )
+	{
+		$template->assign_block_vars('switch_first_post', array());
+	}
+
+	// 만약 주 2회 이상 신청한 경우 알림 템플릿을 내보낸다.
+	else if ($cf_counter > 1 && ( $mode != 'editpost' ) )
+	{
+		$template->assign_block_vars('switch_not_approved_post', array(
+			'TIME' => time(),
+			'CF_POST_TIME' => $cf_post_time,
+			'CF_WEEK_IN_SEC' => $cf_week_in_sec,
+			'CF_COUNTER' => $cf_counter,
+			'CF_USER_NAME' => $userdata['username']
+			)
+		);
+	}
+
+	// 만약 신청 금지 리스트에 있는 경우 금지 템플릿을 내보낸다.
+	else if ($ban_flag)
+	{
+		$template->assign_block_vars('switch_baned', array(
+			'CF_USER_NAME' => $userdata['username'],
+			'BAN_UNTIL' => $ban_until)
+		);
+	}
+	else
+	{
+		$template->assign_block_vars('switch_not_first_post', array());
+	}
+}
+// 실은 해당 페이지를 로드할 때 js로 경고창 띄우로 history.back()하게 만들어서 알림 템플릿과 신청 금지 템플릿은 보이지도 않지만, 혹시나 js 피해서 들어오는 사용자의 경우를 대비해서 php로도 대비 로직을 짜두었다. ;p
+
+//-- fin mod : custom user ban function ----------------------------------------------------------------------------
 
 
 //-- mod : calendar --------------------------------------------------------------------------------
