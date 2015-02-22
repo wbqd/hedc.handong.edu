@@ -2,7 +2,7 @@
 
 
 /*
- * ÀÌ ÆÄÀÏÀº Æ¯Á¤ À¯Àú¸¦ Æ¯Á¤ ±â°£ µ¿¾È English HD¸¦ ½ÅÃ»ÇÏÁö ¸øÇÏ°Ô ¸·´Â ÆÄÀÏÀÔ´Ï´Ù.
+ * ì´ íŒŒì¼ì€ íŠ¹ì • ìœ ì €ë¥¼ íŠ¹ì • ê¸°ê°„ ë™ì•ˆ í—¬í”„ë°ìŠ¤í¬ë¥¼ ì‹ ì²­í•˜ì§€ ëª»í•˜ê²Œ ë§‰ëŠ” íŒŒì¼ìž…ë‹ˆë‹¤.
  */
 define('IN_PHPBB', true);
 $phpbb_root_path = './';
@@ -26,9 +26,10 @@ $template->set_filenames(array (
 	'body' => 'user_ban_body.tpl'
 ));
 
-if (!empty ($_POST['ban_username']) && !empty ($_POST['ban_until'])) {
+if (!empty ($_POST['ban_username']) && !empty ($_POST['ban_until']) && !empty ($_POST['ban_section'])) {
 	$ban_username = $_POST['ban_username'];
 	$ban_until = $_POST['ban_until'];
+	$ban_section = $_POST['ban_section'];
 
 	$sql = "SELECT	user_id
 			FROM	" . USERS_TABLE . "
@@ -43,8 +44,8 @@ if (!empty ($_POST['ban_username']) && !empty ($_POST['ban_until'])) {
 
 	if (!is_null($row['user_id'])) {
 		$ban_user_id = $row['user_id'];
-		$sql = "INSERT INTO " . USER_BAN_TABLE . "(user_id, ban_until)
-				VALUES ('$ban_user_id', '$ban_until')";
+		$sql = "INSERT INTO " . USER_BAN_TABLE . "(user_id, ban_until, ban_section)
+				VALUES ('$ban_user_id', '$ban_until', '$ban_section')";
 
 		if (!($db->sql_query($sql))) {
 			message_die(GENERAL_ERROR, 'Unable to retrieve users');
@@ -54,6 +55,7 @@ if (!empty ($_POST['ban_username']) && !empty ($_POST['ban_until'])) {
 				,		u.user_realname
 				,		b.ban_until
 				,		b.ban_id
+				,		b.ban_section
 				FROM	" . USERS_TABLE . " u
 				JOIN	" . USER_BAN_TABLE . " b
 				ON		u.user_id = b.user_id
@@ -69,7 +71,8 @@ if (!empty ($_POST['ban_username']) && !empty ($_POST['ban_until'])) {
 				'BAN_ID' => $row['ban_id'],
 				'USERNAME' => $row['username'],
 				'USER_REALNAME' => $row['user_realname'],
-				'BAN_UNTIL' => $row['ban_until']
+				'BAN_UNTIL' => $row['ban_until'],
+				'BAN_SECTION' => $row['ban_section']
 			));
 			$ban_index++;
 		}
@@ -89,6 +92,7 @@ if (!empty ($_POST['ban_username']) && !empty ($_POST['ban_until'])) {
 				,		u.user_realname
 				,		b.ban_until
 				,		b.ban_id
+				,		b.ban_section
 				FROM	" . USERS_TABLE . " u
 				JOIN	" . USER_BAN_TABLE . " b
 				ON		u.user_id = b.user_id
@@ -104,7 +108,8 @@ if (!empty ($_POST['ban_username']) && !empty ($_POST['ban_until'])) {
 				'BAN_ID' => $row['ban_id'],
 				'USERNAME' => $row['username'],
 				'USER_REALNAME' => $row['user_realname'],
-				'BAN_UNTIL' => $row['ban_until']
+				'BAN_UNTIL' => $row['ban_until'],
+				'BAN_SECTION' => $row['ban_section']
 			));
 			$ban_index++;
 		}
@@ -114,6 +119,7 @@ if (!empty ($_POST['ban_username']) && !empty ($_POST['ban_until'])) {
 				,		u.user_realname
 				,		b.ban_until
 				,		b.ban_id
+				,		b.ban_section
 				FROM	" . USERS_TABLE . " u
 				JOIN	" . USER_BAN_TABLE . " b
 				ON		u.user_id = b.user_id
@@ -129,7 +135,8 @@ if (!empty ($_POST['ban_username']) && !empty ($_POST['ban_until'])) {
 				'BAN_ID' => $row['ban_id'],
 				'USERNAME' => $row['username'],
 				'USER_REALNAME' => $row['user_realname'],
-				'BAN_UNTIL' => $row['ban_until']
+				'BAN_UNTIL' => $row['ban_until'],
+				'BAN_SECTION' => $row['ban_section']
 			));
 			$ban_index++;
 		}
